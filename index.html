@@ -48,10 +48,12 @@
   .choice-label:hover { border-color: var(--accent); background: var(--accent-light); color: var(--ink); }
   .choice-label input { display: none; }
   .choice-label.selected { border-color: var(--accent); background: var(--accent-light); color: var(--ink); }
+  
   .choice-indicator { width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
   .choice-label.selected .choice-indicator, .choice-label:hover .choice-indicator { border-color: var(--accent); background: var(--accent); }
   .choice-indicator::after { content: ''; width: 6px; height: 6px; border-radius: 50%; background: #fff; opacity: 0; transition: opacity 0.15s; }
   .choice-label.selected .choice-indicator::after { opacity: 1; }
+  
   .checkbox-indicator { width: 16px; height: 16px; border: 1.5px solid var(--border); border-radius: 2px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; transition: all 0.15s ease; }
   .choice-label.selected .checkbox-indicator, .choice-label:hover .checkbox-indicator { border-color: var(--accent); background: var(--accent); }
   .checkbox-indicator::after { content: '✓'; font-size: 10px; color: #fff; opacity: 0; transition: opacity 0.15s; }
@@ -77,12 +79,12 @@
   .submit-section.visible { opacity: 1; transform: translateY(0); }
   .submit-btn { background: var(--ink); color: var(--paper); border: none; padding: 16px 56px; font-family: 'Noto Sans KR', sans-serif; font-size: 13.5px; font-weight: 500; letter-spacing: 0.08em; cursor: pointer; border-radius: 2px; transition: all 0.2s ease; position: relative; overflow: hidden; }
   .submit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-  .submit-btn::after { content: ''; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 0.3s ease; }
+  .submit-btn::after { content: ''; position: absolute; inset: 0; background: var(--accent); transform: scaleX(0); transform-origin: left; transition: transform 0.3s ease; z-index: 0; }
   .submit-btn:not(:disabled):hover::after { transform: scaleX(1); }
   .submit-btn span { position: relative; z-index: 1; }
   .submit-note { font-size: 11.5px; color: var(--ink-muted); text-align: center; }
 
-  .spinner { display: none; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; }
+  .spinner { display: none; width: 20px; height: 20px; border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff; border-radius: 50%; animation: spin 0.7s linear infinite; position: relative; z-index: 1; }
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .done-msg { display: none; text-align: center; padding: 64px 32px; opacity: 0; transition: opacity 0.5s ease; }
@@ -95,8 +97,6 @@
   .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
   footer { text-align: center; padding: 32px; font-size: 11px; color: var(--ink-muted); letter-spacing: 0.05em; border-top: 1px solid var(--border); }
-
-  @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
   @media (max-width: 600px) { .q-card { padding: 24px 20px; } .scale-btns { gap: 5px; } .scale-btn { font-size: 13px; } }
 </style>
 </head>
@@ -307,43 +307,59 @@
 <footer>화장품 할랄 인증 업계 애로사항 설문 · 응답 내용은 정책 개선 목적으로만 활용됩니다</footer>
 
 <script>
-  // ▼▼▼ Apps Script 배포 후 여기에 웹 앱 URL 붙여넣기 ▼▼▼
+  // ── 구글 앱스 스크립트 웹 앱 URL ───────────────────
   var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyfc6q3FQw1xEgKRWgeSLDcp0_wIkWxAtRbq5qtDfMhLFD9CcQkifuqd7YdGmwGfMBN/exec';
-  // ▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲▲
 
-  // ── 선택 인터랙션 ──────────────────────────────
+  // ── 선택 인터랙션 제어 ──────────────────────────────
   document.querySelectorAll('.choices').forEach(function(group) {
     var type = group.dataset.type;
     var max  = group.dataset.max ? parseInt(group.dataset.max) : null;
-    group.querySelectorAll('input[type=radio], input[type=checkbox]').forEach(function(inp) {
-      inp.addEventListener('change', function() {
+    
+    group.querySelectorAll('.choice-label').forEach(function(label) {
+      label.addEventListener('click', function(e) {
+        // 부모-자식 구조 클릭 튐 방지
+        if (e.target.tagName === 'INPUT') return;
+        
+        var inp = label.querySelector('input');
+        if (!inp) return;
+
         if (type === 'radio') {
-          group.querySelectorAll('.choice-label').forEach(function(l) { l.classList.remove('selected'); });
-          inp.closest('.choice-label').classList.add('selected');
+          group.querySelectorAll('.choice-label').forEach(function(l) {
+            l.classList.remove('selected');
+            var childInput = l.querySelector('input');
+            if(childInput) childInput.checked = false;
+          });
+          label.classList.add('selected');
+          inp.checked = true;
         } else {
-          inp.closest('.choice-label').classList.toggle('selected', inp.checked);
-          if (max) {
-            var checked = group.querySelectorAll('input[type=checkbox]:checked');
-            if (checked.length > max) { inp.checked = false; inp.closest('.choice-label').classList.remove('selected'); }
+          if (max && !inp.checked) {
+            var checkedCount = group.querySelectorAll('input[type=checkbox]:checked').length;
+            if (checkedCount >= max) {
+              showToast('⚠ 최대 ' + max + '개까지만 선택 가능합니다.');
+              return;
+            }
           }
+          inp.checked = !inp.checked;
+          label.classList.toggle('selected', inp.checked);
         }
         updateProgress();
       });
     });
   });
 
-  // ── 선형 배율 ──────────────────────────────────
+  // ── 선형 점수 배율 버튼 제어 ─────────────────────────
   document.querySelectorAll('.scale-btns').forEach(function(wrap) {
     wrap.querySelectorAll('.scale-btn').forEach(function(btn) {
       btn.addEventListener('click', function() {
         wrap.querySelectorAll('.scale-btn').forEach(function(b) { b.classList.remove('active'); });
         btn.classList.add('active');
+        wrap.setAttribute('data-value', btn.getAttribute('data-val'));
         updateProgress();
       });
     });
   });
 
-  // ── 기타 입력 표시 ─────────────────────────────
+  // ── 기타 직접 입력 감지 시 인디케이터 시각화 ───────────
   ['q3','q8'].forEach(function(name) {
     var inp = document.getElementById('etc-' + name);
     var ind = document.getElementById('etc-' + name + '-ind');
@@ -352,27 +368,48 @@
       var active = inp.value.trim() !== '';
       ind.style.borderColor = active ? 'var(--accent)' : '';
       ind.style.background  = active ? 'var(--accent)' : '';
+      updateProgress();
     });
   });
 
-  // ── 진행률 ─────────────────────────────────────
+  // ── 프로그레스 바 실시간 계산 업데이트 ────────────────
   function updateProgress() {
     var answered = 0;
-    ['q1','q2','q8','q11'].forEach(function(n) { if (document.querySelector('input[name="'+n+'"]:checked')) answered++; });
-    ['q3','q5','q7','q10','q12'].forEach(function(n) { if (document.querySelector('input[name="'+n+'"]:checked')) answered++; });
-    ['q4','q6','q9'].forEach(function(n) { if (document.querySelector('.scale-btns[data-name="'+n+'"] .scale-btn.active')) answered++; });
+    
+    // 라디오 및 체크박스 정밀 검증
+    ['q1','q2','q11'].forEach(function(n) { if (document.querySelector('input[name="'+n+'"]:checked')) answered++; });
+    
+    var etcQ3 = document.getElementById('etc-q3') ? document.getElementById('etc-q3').value.trim() : '';
+    if (document.querySelector('input[name="q3"]:checked') || etcQ3) answered++;
+    
+    if (document.querySelector('input[name="q5"]:checked')) answered++;
+    if (document.querySelector('input[name="q7"]:checked')) answered++;
+    
+    var etcQ8 = document.getElementById('etc-q8') ? document.getElementById('etc-q8').value.trim() : '';
+    if (document.querySelector('input[name="q8"]:checked') || etcQ8) answered++;
+    
+    if (document.querySelector('input[name="q10"]:checked')) answered++;
+    if (document.querySelector('input[name="q12"]:checked')) answered++;
+    
+    // 점수형 배율 검증
+    ['q4','q6','q9'].forEach(function(n) {
+      if (document.querySelector('.scale-btns[data-name="'+n+'"]').getAttribute('data-value')) answered++;
+    });
+    
+    // 주관식 검증
     ['q13','q14'].forEach(function(n) { if (document.querySelector('[name="'+n+'"]').value.trim()) answered++; });
+
     document.getElementById('progressBar').style.width = Math.round(answered / 14 * 100) + '%';
   }
   document.querySelectorAll('textarea').forEach(function(t) { t.addEventListener('input', updateProgress); });
 
-  // ── 스크롤 애니메이션 ──────────────────────────
+  // ── 스크롤 등장 애니메이션 ──────────────────────────
   var observer = new IntersectionObserver(function(entries) {
     entries.forEach(function(e) { if (e.isIntersecting) { e.target.classList.add('visible'); observer.unobserve(e.target); } });
   }, { threshold: 0.1 });
   document.querySelectorAll('.q-card, .section-header, .submit-section').forEach(function(el) { observer.observe(el); });
 
-  // ── 토스트 알림 ────────────────────────────────
+  // ── 토스트 알림 메시지 ──────────────────────────────
   function showToast(msg) {
     var t = document.getElementById('toast');
     t.textContent = msg;
@@ -380,83 +417,78 @@
     setTimeout(function() { t.classList.remove('show'); }, 3500);
   }
 
-  // ── 응답 수집 함수 ─────────────────────────────
+  // ── 구글 앱스 스크립트 규격 맞춤형 데이터 가공 ──────────
   function collectAnswers() {
     var data = {};
 
-    // 라디오
-    ['q1','q2','q8','q11'].forEach(function(n) {
+    // 1. 일반 선택형 라디오 항목 (Q1, Q2, Q11)
+    ['q1','q2','q11'].forEach(function(n) {
       var el = document.querySelector('input[name="'+n+'"]:checked');
       data[n] = el ? el.value : '';
     });
 
-    // 체크박스
-    ['q3','q5','q7','q10','q12'].forEach(function(n) {
+    // 2. 다중 선택형 체크박스 항목 (Q5, Q7, Q10, Q12)
+    ['q5','q7','q10','q12'].forEach(function(n) {
       var vals = [];
       document.querySelectorAll('input[name="'+n+'"]:checked').forEach(function(el) { vals.push(el.value); });
       data[n] = vals.join(', ');
     });
 
-    // 기타 직접 입력 추가
-    var etcQ3 = document.getElementById('etc-q3').value.trim();
-    if (etcQ3) data['q3'] = data['q3'] ? data['q3'] + ', 기타: ' + etcQ3 : '기타: ' + etcQ3;
-    var etcQ8 = document.getElementById('etc-q8').value.trim();
-    if (etcQ8) data['q8'] = data['q8'] ? data['q8'] + ' / 기타: ' + etcQ8 : '기타: ' + etcQ8;
+    // 3. 다중 선택 + 기타 입력 보정 항목 (Q3)
+    var q3Vals = [];
+    document.querySelectorAll('input[name="q3"]:checked').forEach(function(el) { q3Vals.push(el.value); });
+    var etcQ3 = document.getElementById('etc-q3') ? document.getElementById('etc-q3').value.trim() : '';
+    if (etcQ3) q3Vals.push('기타: ' + etcQ3);
+    data['q3'] = q3Vals.join(', ');
 
-    // 선형 배율
+    // 4. 단일 선택 + 기타 입력 보정 항목 (Q8)
+    var q8El = document.querySelector('input[name="q8"]:checked');
+    var q8Val = q8El ? q8El.value : '';
+    var etcQ8 = document.getElementById('etc-q8') ? document.getElementById('etc-q8').value.trim() : '';
+    if (etcQ8) q8Val = q8Val ? q8Val + ' / 기타: ' + etcQ8 : '기타: ' + etcQ8;
+    data['q8'] = q8Val;
+
+    // 5. 점수 선택형 선형 배율 항목 (Q4, Q6, Q9)
     ['q4','q6','q9'].forEach(function(n) {
-      var el = document.querySelector('.scale-btns[data-name="'+n+'"] .scale-btn.active');
-      data[n] = el ? el.dataset.val : '';
+      var val = document.querySelector('.scale-btns[data-name="'+n+'"]').getAttribute('data-value');
+      data[n] = val || '';
     });
 
-    // 텍스트
+    // 6. 단답/장문 텍스트 항목 (Q13, Q14)
     data['q13'] = document.querySelector('[name="q13"]').value.trim();
     data['q14'] = document.querySelector('[name="q14"]').value.trim();
 
     return data;
   }
 
-  // ── 제출 ───────────────────────────────────────
+  // ── 제출 및 비동기 파이프라인 제어 ────────────────────
   document.getElementById('surveyForm').addEventListener('submit', function(e) {
     e.preventDefault();
 
-    // 필수 항목 검사 (Q1~Q11)
+    // 완벽한 유효성 정밀 필터링 (필수 항목 Q1 ~ Q11)
     var missing = false;
     
-    // 1. 라디오 버튼 검사 (Q1, Q2, Q11)
-    ['q1','q2','q11'].forEach(function(n) { 
-      if (!document.querySelector('input[name="'+n+'"]:checked')) missing = true; 
-    });
+    if (!document.querySelector('input[name="q1"]:checked')) missing = true;
+    if (!document.querySelector('input[name="q2"]:checked')) missing = true;
     
-    // 2. 체크박스 검사 (Q3, Q5, Q7, Q10, Q12)
-    ['q3','q5','q7','q10','q12'].forEach(function(n) { 
-      var hasChecked = document.querySelector('input[name="'+n+'"]:checked') !== null;
-      var etcInp = document.getElementById('etc-' + n);
-      var hasEtc = etcInp && etcInp.value.trim() !== '';
-      
-      if (!hasChecked && !hasEtc) missing = true; 
-    });
+    var etcQ3 = document.getElementById('etc-q3') ? document.getElementById('etc-q3').value.trim() : '';
+    if (!document.querySelector('input[name="q3"]:checked') && !etcQ3) missing = true;
     
-    // 3. 선형 배율 검사 (Q4, Q6, Q9)
-    ['q4','q6','q9'].forEach(function(n) { 
-      if (!document.querySelector('.scale-btns[data-name="'+n+'"] .scale-btn.active')) missing = true; 
-    });
+    if (!document.querySelector('.scale-btns[data-name="q4"]').getAttribute('data-value')) missing = true;
+    if (!document.querySelector('input[name="q5"]:checked')) missing = true;
+    if (!document.querySelector('.scale-btns[data-name="q6"]').getAttribute('data-value')) missing = true;
+    if (!document.querySelector('input[name="q7"]:checked')) missing = true;
     
-    // 4. Q8 생산시설 애로사항 검사 (라디오 또는 기타 입력 체크)
-    var hasQ8Radio = document.querySelector('input[name="q8"]:checked') !== null;
-    var hasQ8Etc = document.getElementById('etc-q8').value.trim() !== '';
-    if (!hasQ8Radio && !hasQ8Etc) missing = true;
+    var etcQ8 = document.getElementById('etc-q8') ? document.getElementById('etc-q8').value.trim() : '';
+    if (!document.querySelector('input[name="q8"]:checked') && !etcQ8) missing = true;
+    
+    if (!document.querySelector('.scale-btns[data-name="q9"]').getAttribute('data-value')) missing = true;
+    if (!document.querySelector('input[name="q10"]:checked')) missing = true;
+    if (!document.querySelector('input[name="q11"]:checked')) missing = true;
 
     if (missing) { showToast('⚠ 필수 항목(Q1~Q11)을 모두 응답해주세요.'); return; }
 
-    // URL 미설정 시 로컬 테스트 모드
-    if (SCRIPT_URL === 'YOUR_APPS_SCRIPT_WEB_APP_URL') {
-      console.log('제출 데이터:', collectAnswers());
-      showDone();
-      return;
-    }
-
-    // 제출 버튼 로딩 상태
+    // 전송 모듈 로딩 가동
     var btn = document.getElementById('submitBtn');
     var label = document.getElementById('submitLabel');
     var spinner = document.getElementById('submitSpinner');
@@ -464,7 +496,7 @@
     label.style.display = 'none';
     spinner.style.display = 'block';
 
-    // Google Apps Script로 전송
+    // Google Apps Script 연동 통신
     fetch(SCRIPT_URL, {
       method: 'POST',
       mode: 'no-cors',
